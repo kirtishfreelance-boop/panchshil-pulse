@@ -1,7 +1,7 @@
 name: panchshil_pulse
 description: Panchshil Pulse — the community app for Panchshil office parks and residences.
 publish_to: "none"
-version: 1.0.0+1
+version: 1.0.1+2
 
 environment:
   # 3.6 is the floor for Color.withValues() and the *ThemeData theme classes.
@@ -34,7 +34,8 @@ dependencies:
   # Media / device
   video_player: ^2.9.2
   image_picker: ^1.1.2
-  mobile_scanner: ^5.2.3
+  # 7.x ships 16 KB-page-aligned MLKit/CameraX natives, required by Android 15+.
+  mobile_scanner: ^7.0.0
   qr_flutter: ^4.1.0
   share_plus: ^10.1.2
   url_launcher: ^6.3.1

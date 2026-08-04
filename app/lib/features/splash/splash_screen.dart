@@ -30,8 +30,12 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    _startVideo();
-    _boot();
+    // Both of these call setState on their first pass, so they must not run
+    // until the first frame is on screen.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _startVideo();
+      _boot();
+    });
   }
 
   Future<void> _startVideo() async {
