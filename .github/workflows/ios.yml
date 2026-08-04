@@ -1,0 +1,103 @@
+# Alternative to Codemagic: GitHub's own hosted macOS runners.
+#
+# `verify` needs no Apple account and proves the iOS code compiles.
+# `testflight` needs Apple credentials stored as repository secrets.
+
+name: iOS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  verify:
+    name: Compile check (no Apple account)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.44.8"
+          channel: stable
+          cache: true
+
+      - name: Fetch dependencies
+        working-directory: app
+        run: flutter pub get
+
+      - name: Analyze
+        working-directory: app
+        run: flutter analyze
+
+      - name: Test
+        working-directory: app
+        run: flutter test
+
+      - name: Build (unsigned)
+        working-directory: app
+        run: flutter build ios --release --no-codesign
+
+  testflight:
+    name: Build and upload to TestFlight
+    runs-on: macos-latest
+    # Only runs once the Apple secrets exist, so the repo stays green until then.
+    if: ${{ vars.APPLE_READY == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.44.8"
+          channel: stable
+          cache: true
+
+      - name: Import signing certificate
+        env:
+          CERT_P12: ${{ secrets.IOS_DIST_CERT_P12 }}
+          CERT_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+          PROFILE: ${{ secrets.IOS_PROVISIONING_PROFILE }}
+        run: |
+          KEYCHAIN=$RUNNER_TEMP/build.keychain
+          security create-keychain -p "" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "" "$KEYCHAIN"
+
+          echo "$CERT_P12" | base64 --decode > $RUNNER_TEMP/cert.p12
+          security import $RUNNER_TEMP/cert.p12 -k "$KEYCHAIN" \
+            -P "$CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -k "" "$KEYCHAIN"
+          security list-keychain -d user -s "$KEYCHAIN"
+
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          echo "$PROFILE" | base64 --decode > \
+            ~/Library/MobileDevice/Provisioning\ Profiles/pulse.mobileprovision
+
+      - name: Fetch dependencies
+        working-directory: app
+        run: flutter pub get
+
+      - name: Build IPA
+        working-directory: app
+        run: |
+          flutter build ipa --release \
+            --build-number=${{ github.run_number }} \
+            --export-options-plist=ios/ExportOptions.plist
+
+      - name: Upload to TestFlight
+        env:
+          KEY_ID: ${{ secrets.APP_STORE_KEY_ID }}
+          ISSUER_ID: ${{ secrets.APP_STORE_ISSUER_ID }}
+          PRIVATE_KEY: ${{ secrets.APP_STORE_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/private_keys
+          echo "$PRIVATE_KEY" > ~/private_keys/AuthKey_$KEY_ID.p8
+          xcrun altool --upload-app -f app/build/ios/ipa/*.ipa -t ios \
+            --apiKey "$KEY_ID" --apiIssuer "$ISSUER_ID"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pulse-ipa
+          path: app/build/ios/ipa/*.ipa

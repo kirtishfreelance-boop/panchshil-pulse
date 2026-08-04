@@ -1,0 +1,92 @@
+name: panchshil_pulse
+description: Panchshil Pulse — the community app for Panchshil office parks and residences.
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  # 3.6 is the floor for Color.withValues() and the *ThemeData theme classes.
+  sdk: ">=3.6.0 <4.0.0"
+  flutter: ">=3.27.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State + DI
+  provider: ^6.1.2
+
+  # Networking
+  dio: ^5.7.0
+
+  # Storage
+  shared_preferences: ^2.3.3
+
+  # UI toolkit — mirrors the original app's stack
+  flutter_screenutil: ^5.9.3
+  flutter_svg: ^2.0.10+1
+  cached_network_image: ^3.4.1
+  carousel_slider: ^5.0.0
+  shimmer: ^3.0.0
+  readmore: ^3.0.0
+  dropdown_button2: ^2.3.9
+  cupertino_icons: ^1.0.8
+
+  # Media / device
+  video_player: ^2.9.2
+  image_picker: ^1.1.2
+  mobile_scanner: ^5.2.3
+  qr_flutter: ^4.1.0
+  share_plus: ^10.1.2
+  url_launcher: ^6.3.1
+  add_2_calendar: ^3.0.1
+
+  # Formatting
+  intl: ^0.19.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/
+    - assets/svg/
+    - assets/pulse/
+    - assets/home_screen/
+    - assets/discover_services/
+    - assets/events/
+    - assets/carpool/
+    - assets/curated_services/
+    - assets/document/
+    - assets/food_court/
+    - assets/my_wallet/
+    - assets/panchshil_privilege/
+    - assets/profile/
+    - assets/launcher/
+    - assets/gif/
+
+  fonts:
+    - family: Futura
+      fonts:
+        - asset: assets/fonts/FuturaL.ttf
+          weight: 300
+        - asset: assets/fonts/Futura-Bk-BT-Book.ttf
+          weight: 400
+        - asset: assets/fonts/futura-medium-bt.ttf
+          weight: 500
+        - asset: assets/fonts/futura_md_bt_bold.ttf
+          weight: 700
+        - asset: assets/fonts/Futura_heavy.ttf
+          weight: 900
+    - family: Trajan
+      fonts:
+        - asset: assets/fonts/TrajanPro-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/TrajanPro-Bold.ttf
+          weight: 700
+    - family: Trykker
+      fonts:
+        - asset: assets/fonts/Trykker-Regular.ttf

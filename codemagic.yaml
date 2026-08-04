@@ -1,0 +1,146 @@
+# Codemagic CI — builds Panchshil Pulse on a hosted macOS machine.
+#
+# This exists because iOS binaries can only be produced on macOS. Codemagic rents
+# a Mac for the duration of the build, so no Mac hardware is required.
+#
+# Setup is documented in IOS_SETUP.md. In short:
+#   1. Push this repo to GitHub/GitLab/Bitbucket
+#   2. Add the app in Codemagic and connect the repo
+#   3. Codemagic → Teams → Integrations → Apple Developer Portal (App Store Connect API key)
+#   4. Create an environment group named `appstore` holding APP_STORE_APPLE_ID
+#   5. Start the `ios-testflight` workflow
+
+definitions:
+  flutter_env: &flutter_env
+    flutter: 3.44.8
+    xcode: latest
+    cocoapods: default
+
+workflows:
+
+  # ---------------------------------------------------------------------------
+  # Signed build, uploaded to TestFlight. This is the one that puts the app on
+  # an iPhone. Requires a paid Apple Developer account.
+  # ---------------------------------------------------------------------------
+  ios-testflight:
+    name: iOS — build and ship to TestFlight
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      <<: *flutter_env
+      groups:
+        - appstore          # must define APP_STORE_APPLE_ID
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.panchshil.pulse
+      vars:
+        BUNDLE_ID: "com.panchshil.pulse"
+
+    integrations:
+      app_store_connect: pulse_api_key   # name of the key added in step 3
+
+    scripts:
+      - name: Fetch Dart dependencies
+        script: cd app && flutter pub get
+
+      - name: Static analysis
+        script: cd app && flutter analyze
+
+      - name: Unit tests
+        script: cd app && flutter test
+
+      - name: Install CocoaPods
+        script: cd app/ios && pod install
+
+      - name: Set up signing
+        script: xcode-project use-profiles
+
+      - name: Build the IPA
+        script: |
+          cd app
+          # build_number must increase on every TestFlight upload
+          flutter build ipa --release \
+            --build-number=$(($PROJECT_BUILD_NUMBER)) \
+            --export-options-plist=/Users/builder/export_options.plist
+
+    artifacts:
+      - app/build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - app/build/ios/archive/*.xcarchive
+
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        # Uncomment once you have a tester group configured in App Store Connect
+        # beta_groups:
+        #   - Panchshil internal
+      email:
+        recipients:
+          - markcomm2000@gmail.com
+        notify:
+          success: true
+          failure: true
+
+  # ---------------------------------------------------------------------------
+  # Unsigned build. Needs NO Apple account — use it to prove the iOS code
+  # compiles before paying for the Developer Program. The output cannot be
+  # installed on a device.
+  # ---------------------------------------------------------------------------
+  ios-verify:
+    name: iOS — compile check (no Apple account needed)
+    instance_type: mac_mini_m2
+    max_build_duration: 45
+    environment:
+      <<: *flutter_env
+
+    scripts:
+      - name: Fetch Dart dependencies
+        script: cd app && flutter pub get
+
+      - name: Static analysis
+        script: cd app && flutter analyze
+
+      - name: Unit tests
+        script: cd app && flutter test
+
+      - name: Install CocoaPods
+        script: cd app/ios && pod install
+
+      - name: Build without code signing
+        script: cd app && flutter build ios --release --no-codesign
+
+    artifacts:
+      - /tmp/xcodebuild_logs/*.log
+
+    publishing:
+      email:
+        recipients:
+          - markcomm2000@gmail.com
+        notify:
+          success: true
+          failure: true
+
+  # ---------------------------------------------------------------------------
+  # Android release APK, for parity with the local build.
+  # ---------------------------------------------------------------------------
+  android-release:
+    name: Android — release APK
+    instance_type: linux_x2
+    max_build_duration: 45
+    environment:
+      flutter: 3.44.8
+      java: 17
+
+    scripts:
+      - name: Fetch Dart dependencies
+        script: cd app && flutter pub get
+
+      - name: Unit tests
+        script: cd app && flutter test
+
+      - name: Build APK
+        script: cd app && flutter build apk --release
+
+    artifacts:
+      - app/build/app/outputs/flutter-apk/*.apk

@@ -1,0 +1,31 @@
+# Render Blueprint — deploys the Pulse API so the app works anywhere,
+# not just on the Wi-Fi the backend happens to be running on.
+#
+# Deploy: Render dashboard -> New -> Blueprint -> pick this repo.
+
+services:
+  - type: web
+    name: panchshil-pulse-api
+    runtime: node
+    plan: free
+    region: singapore # closest Render region to India
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: true
+
+    envVars:
+      # node:sqlite needs Node 22.5+; Render's default is older.
+      - key: NODE_VERSION
+        value: "22.20.0"
+      - key: NODE_ENV
+        value: production
+      # Generated once by Render and kept across deploys. Rotating it signs
+      # every existing session out.
+      - key: JWT_SECRET
+        generateValue: true
+      # Dev convenience: the API returns the OTP in its response so testers can
+      # sign in without an SMS gateway. Set to "false" before real users.
+      - key: PULSE_ECHO_OTP
+        value: "true"
