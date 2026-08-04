@@ -13,6 +13,7 @@ class SessionStore {
   static const _kSiteId = 'pulse.site_id';
   static const _kThemeMode = 'pulse.theme_mode';
   static const _kSeenOnboarding = 'pulse.seen_onboarding';
+  static const _kApiBaseUrl = 'pulse.api_base_url';
 
   final SharedPreferences _prefs;
 
@@ -66,6 +67,18 @@ class SessionStore {
 
   bool get seenOnboarding => _prefs.getBool(_kSeenOnboarding) ?? false;
   Future<void> setSeenOnboarding(bool value) => _prefs.setBool(_kSeenOnboarding, value);
+
+  /// Overrides the compile-time API base URL. Lets one build be pointed at a
+  /// laptop on the LAN, a staging host, or production without reinstalling.
+  String? get apiBaseUrl => _prefs.getString(_kApiBaseUrl);
+  Future<void> setApiBaseUrl(String? value) async {
+    final trimmed = value?.trim().replaceAll(RegExp(r'/+$'), '');
+    if (trimmed == null || trimmed.isEmpty) {
+      await _prefs.remove(_kApiBaseUrl);
+    } else {
+      await _prefs.setString(_kApiBaseUrl, trimmed);
+    }
+  }
 
   Future<void> clear() async {
     await _prefs.remove(_kToken);

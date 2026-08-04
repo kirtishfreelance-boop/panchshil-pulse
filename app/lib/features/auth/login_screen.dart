@@ -7,6 +7,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/widgets/pulse_widgets.dart';
 import '../../providers/auth_provider.dart';
 import 'otp_verification_screen.dart';
+import 'server_settings_sheet.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -76,9 +77,29 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Image.asset(
-                  isDark ? 'assets/login_logo_dark.png' : 'assets/login_logo_light.png',
-                  height: 92,
+                Row(
+                  children: [
+                    Expanded(
+                      child: Image.asset(
+                        isDark
+                            ? 'assets/login_logo_dark.png'
+                            : 'assets/login_logo_light.png',
+                        height: 92,
+                        alignment: Alignment.centerLeft,
+                      ),
+                    ),
+                    // Testers need to repoint the app at another backend
+                    // without waiting for a new build.
+                    IconButton(
+                      tooltip: 'Server settings',
+                      icon: Icon(
+                        Icons.dns_outlined,
+                        size: 20,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                      onPressed: () => ServerSettingsSheet.show(context),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 40),
                 Text('Welcome to Pulse', style: theme.textTheme.headlineLarge),

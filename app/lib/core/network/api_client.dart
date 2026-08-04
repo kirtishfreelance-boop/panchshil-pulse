@@ -11,7 +11,9 @@ class ApiClient {
   ApiClient(this._session, {Dio? dio})
       : _dio = dio ??
             Dio(BaseOptions(
-              baseUrl: AppConfig.apiBaseUrl,
+              // A saved override wins, so a single build can be repointed at a
+              // different server from inside the app.
+              baseUrl: _session.apiBaseUrl ?? AppConfig.apiBaseUrl,
               connectTimeout: AppConfig.connectTimeout,
               receiveTimeout: AppConfig.receiveTimeout,
               contentType: Headers.jsonContentType,
@@ -50,6 +52,25 @@ class ApiClient {
 
   /// Set by AuthProvider so an expired token bounces the user to login.
   VoidCallback? onUnauthorized;
+
+  String get baseUrl => _dio.options.baseUrl;
+
+  /// Repoints the client at another server and remembers the choice.
+  /// Passing null restores the URL the app was built with.
+  Future<void> setBaseUrl(String? url) async {
+    await _session.setApiBaseUrl(url);
+    _dio.options.baseUrl = _session.apiBaseUrl ?? AppConfig.apiBaseUrl;
+  }
+
+  /// Cheap reachability probe used by the splash and the server picker.
+  Future<bool> ping() async {
+    try {
+      final json = await get('/health');
+      return json['status'] == 'ok';
+    } catch (_) {
+      return false;
+    }
+  }
 
   Future<Map<String, dynamic>> get(
     String path, {
