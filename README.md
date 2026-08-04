@@ -66,6 +66,25 @@ New-NetFirewallRule -DisplayName "Panchshil Pulse API" -Direction Inbound -Proto
 
 ---
 
+## Hosting the API
+
+For the app to work anywhere — an office, mobile data, a colleague's phone — the backend has to be on the public internet rather than this PC.
+
+**One-click deploy:** https://render.com/deploy?repo=https://github.com/kirtishfreelance-boop/panchshil-pulse
+
+Render reads [render.yaml](render.yaml) and creates the service. It pins Node 22 (`node:sqlite` needs 22.5+), generates a `JWT_SECRET`, and health-checks `/health`.
+
+Two things to know about the free tier:
+
+- **It sleeps after 15 minutes idle.** The next request waits ~60 s for a cold start. The splash screen shows "Waking the server…" while that happens, and client timeouts are set to 60 s connect / 90 s receive to cover it.
+- **The disk is ephemeral.** A redeploy wipes the SQLite file, so the API re-seeds itself on boot when it finds an empty database. Demo content always returns; accounts and posts created during testing do not survive a redeploy. Render Starter ($7/mo) adds a persistent disk and removes the sleep.
+
+### Changing the server without rebuilding
+
+The login screen has a server icon. It accepts any base URL, tests `/health` before saving, and rolls back if there's no answer. The choice persists across restarts. That means one APK can be pointed at a laptop on the LAN, at Render, or at production — no reinstall.
+
+---
+
 ## Building
 
 ```bash
