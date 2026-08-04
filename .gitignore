@@ -41,3 +41,6 @@ app/**/*.iml
 Thumbs.db
 
 backend/data/
+
+# ...except the builds served from the install page
+!backend/src/public/*.apk

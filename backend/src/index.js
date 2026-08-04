@@ -32,6 +32,22 @@ app.use(adminRoutes);
 app.use('/admin', express.static(path.join(here, 'admin')));
 app.get('/admin', (_req, res) => res.sendFile(path.join(here, 'admin', 'index.html')));
 
+// Public install page. The repository is private, so GitHub Releases are not a
+// shareable download link — the app is served from here instead.
+const publicDir = path.join(here, 'public');
+app.get('/download', (_req, res) => res.sendFile(path.join(publicDir, 'download.html')));
+app.use(
+  '/download',
+  express.static(publicDir, {
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith('.apk')) {
+        res.setHeader('Content-Type', 'application/vnd.android.package-archive');
+        res.setHeader('Content-Disposition', `attachment; filename="${path.basename(filePath)}"`);
+      }
+    },
+  })
+);
+
 app.use(authRoutes);
 app.use(siteRoutes);
 app.use(eventRoutes);
