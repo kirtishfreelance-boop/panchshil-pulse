@@ -46,7 +46,7 @@ const insertAdmin = db.prepare(
  * logs ever sees it.
  */
 export function ensureBootstrapAdmin() {
-  if ((row(countAdmins)?.c ?? 0) > 0) return null;
+  if ((row(countAdmins)?.c ?? 0) > 0) return syncOwnerPassword();
 
   const email = process.env.ADMIN_EMAIL ?? 'admin@panchshil.com';
   const generated = !process.env.ADMIN_PASSWORD;
@@ -66,6 +66,26 @@ export function ensureBootstrapAdmin() {
   console.log('');
 
   return { email, generated };
+}
+
+const findOwner = db.prepare("SELECT * FROM admins WHERE role = 'owner' ORDER BY id LIMIT 1");
+const updatePassword = db.prepare('UPDATE admins SET password_hash = ? WHERE id = ?');
+
+/**
+ * Lets ADMIN_PASSWORD act as a recovery path once the account exists: set it in
+ * the host's environment, redeploy, and the owner password becomes that value.
+ * Only somebody who already controls the deployment can do this.
+ */
+function syncOwnerPassword() {
+  const desired = process.env.ADMIN_PASSWORD;
+  if (!desired) return null;
+
+  const owner = row(findOwner);
+  if (!owner || verifyPassword(desired, owner.password_hash)) return null;
+
+  updatePassword.run(hashPassword(desired), owner.id);
+  console.log(`  Owner password reset from ADMIN_PASSWORD for ${owner.email}`);
+  return { email: owner.email, reset: true };
 }
 
 export function login(email, password) {
