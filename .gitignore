@@ -28,6 +28,11 @@ app/android/app/google-services.json
 app/ios/Runner/GoogleService-Info.plist
 app/**/*.iml
 
+# Built binaries — distributed via GitHub Releases, not committed
+*.apk
+*.aab
+*.ipa
+
 # Editors / OS
 .idea/
 .vscode/
