@@ -1,5 +1,4 @@
-# Render Blueprint — deploys the Pulse API so the app works anywhere,
-# not just on the Wi-Fi the backend happens to be running on.
+# Render Blueprint — deploys the Pulse API and admin console.
 #
 # Deploy: Render dashboard -> New -> Blueprint -> pick this repo.
 
@@ -15,17 +14,54 @@ services:
     healthCheckPath: /health
     autoDeploy: true
 
+    # A mounted disk is the difference between a demo and a real deployment:
+    # without it the SQLite file is recreated on every deploy and all member
+    # accounts, registrations and posts are lost.
+    #
+    # Disks require a paid instance type. On the free plan Render ignores this
+    # block, the database falls back to the container filesystem, and the app
+    # re-seeds itself on each restart. Switch `plan` to `starter` to turn it on.
+    disk:
+      name: pulse-data
+      mountPath: /var/data
+      sizeGB: 1
+
     envVars:
       # node:sqlite needs Node 22.5+; Render's default is older.
       - key: NODE_VERSION
         value: "22.20.0"
       - key: NODE_ENV
         value: production
+
+      # Keeps the database on the mounted disk when there is one.
+      - key: PULSE_DB
+        value: /var/data/pulse.db
+
       # Generated once by Render and kept across deploys. Rotating it signs
-      # every existing session out.
+      # every existing app session out.
       - key: JWT_SECRET
         generateValue: true
-      # Dev convenience: the API returns the OTP in its response so testers can
-      # sign in without an SMS gateway. Set to "false" before real users.
-      - key: PULSE_ECHO_OTP
-        value: "true"
+
+      # First administrator for /admin. Change the password after first sign-in.
+      - key: ADMIN_EMAIL
+        value: admin@panchshil.com
+      - key: ADMIN_PASSWORD
+        sync: false # set this yourself in the Render dashboard
+
+      # OTP delivery. Leave as "console" and codes are logged and returned in
+      # the API response for testing. Set to "msg91" or "twilio" and add the
+      # matching credentials to send real SMS.
+      - key: SMS_PROVIDER
+        value: console
+      - key: MSG91_AUTH_KEY
+        sync: false
+      - key: MSG91_TEMPLATE_ID
+        sync: false
+      - key: MSG91_SENDER_ID
+        sync: false
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_FROM
+        sync: false

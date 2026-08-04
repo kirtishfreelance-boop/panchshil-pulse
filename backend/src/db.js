@@ -1,9 +1,39 @@
 import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
+import fs from 'node:fs';
 import path from 'node:path';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const dbPath = process.env.PULSE_DB ?? path.join(here, '..', 'pulse.db');
+const localPath = path.join(here, '..', 'pulse.db');
+
+/**
+ * PULSE_DB points the database at a mounted persistent disk in production.
+ *
+ * The same blueprint is used on plans that do not include a disk, where that
+ * mount point does not exist. Rather than refuse to boot, fall back to the
+ * container filesystem — the data will not survive a redeploy, but the service
+ * comes up and says so.
+ */
+function resolveDbPath() {
+  const configured = process.env.PULSE_DB;
+  if (!configured) return localPath;
+
+  const dir = path.dirname(configured);
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+    fs.accessSync(dir, fs.constants.W_OK);
+    return configured;
+  } catch {
+    console.warn(
+      `PULSE_DB is set to ${configured} but ${dir} is not writable — ` +
+        'falling back to ephemeral storage. Attach a disk to keep data across deploys.'
+    );
+    return localPath;
+  }
+}
+
+const dbPath = resolveDbPath();
+console.log(`Database: ${dbPath}`);
 
 export const db = new DatabaseSync(dbPath);
 
@@ -51,8 +81,11 @@ CREATE TABLE IF NOT EXISTS otps (
   mobile TEXT NOT NULL,
   code TEXT NOT NULL,
   expires_at TEXT NOT NULL,
-  consumed INTEGER NOT NULL DEFAULT 0
+  consumed INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE INDEX IF NOT EXISTS idx_otps_mobile ON otps (mobile, id DESC);
 
 CREATE TABLE IF NOT EXISTS event_categories (
   id INTEGER PRIMARY KEY,
@@ -169,6 +202,23 @@ CREATE TABLE IF NOT EXISTS wallet_transactions (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS admins (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  email TEXT NOT NULL UNIQUE,
+  name TEXT,
+  password_hash TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT 'admin',
+  last_login_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS admin_sessions (
+  token TEXT PRIMARY KEY,
+  admin_id INTEGER NOT NULL REFERENCES admins(id) ON DELETE CASCADE,
+  expires_at TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS service_categories (
   id INTEGER PRIMARY KEY,
   name TEXT NOT NULL,
@@ -179,6 +229,22 @@ CREATE TABLE IF NOT EXISTS service_categories (
   active INTEGER NOT NULL DEFAULT 1
 );
 `);
+
+/**
+ * Adds columns that later versions introduced. `CREATE TABLE IF NOT EXISTS`
+ * leaves an existing table untouched, so a deployed database needs this to
+ * pick up new fields without being wiped.
+ */
+function addColumnIfMissing(table, column, definition) {
+  const existing = db.prepare(`PRAGMA table_info(${table})`).all();
+  if (existing.some((c) => c.name === column)) return;
+  db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  console.log(`Migration: added ${table}.${column}`);
+}
+
+// SQLite refuses a non-constant DEFAULT in ALTER TABLE, so backfill instead.
+addColumnIfMissing('otps', 'created_at', 'TEXT');
+db.exec("UPDATE otps SET created_at = datetime('now') WHERE created_at IS NULL");
 
 /** Rows come back as null-prototype objects; spread them into plain ones. */
 export const rows = (stmt, ...args) => stmt.all(...args).map((r) => ({ ...r }));

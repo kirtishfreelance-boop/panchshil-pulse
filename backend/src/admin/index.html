@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pulse Admin</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%232674DA'/><path d='M4 16h4l3-8 4 16 3-10 2 2h6' stroke='white' stroke-width='2.2' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div id="login" class="login-wrap">
+  <form class="login-card" id="login-form">
+    <div class="brand"><span>Panchshil</span> PULSE</div>
+    <h1>Admin console</h1>
+    <p class="sub">Manage events, notices, communities and members.</p>
+    <label for="email">Email</label>
+    <input id="email" type="email" autocomplete="username" required>
+    <label for="password">Password</label>
+    <input id="password" type="password" autocomplete="current-password" required>
+    <p class="error" id="login-error" hidden></p>
+    <button class="btn primary" type="submit">Sign in</button>
+  </form>
+</div>
+
+<div id="app" hidden>
+  <aside class="sidebar">
+    <div class="brand"><span>Panchshil</span> PULSE</div>
+    <nav id="nav"></nav>
+    <div class="sidebar-foot">
+      <div class="who" id="who"></div>
+      <button class="btn ghost small" id="logout">Sign out</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <h1 id="page-title">Dashboard</h1>
+      <div class="topbar-actions" id="topbar-actions"></div>
+    </header>
+    <div class="content" id="content"></div>
+  </main>
+</div>
+
+<div class="modal-backdrop" id="modal" hidden>
+  <div class="modal">
+    <header>
+      <h2 id="modal-title">Edit</h2>
+      <button class="icon-btn" id="modal-close" aria-label="Close">&times;</button>
+    </header>
+    <form id="modal-form"><div class="fields" id="modal-fields"></div></form>
+    <footer>
+      <p class="error" id="modal-error" hidden></p>
+      <div class="spacer"></div>
+      <button class="btn ghost" id="modal-cancel" type="button">Cancel</button>
+      <button class="btn primary" id="modal-save" type="button">Save</button>
+    </footer>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script src="app.js"></script>
+</body>
+</html>

@@ -2,12 +2,18 @@ import { Router } from 'express';
 import { db, row } from '../db.js';
 import { authenticate, issueToken } from '../middleware/auth.js';
 import { userJson } from '../serializers.js';
+import { isDevOtpMode, sendOtp } from '../sms.js';
 
 export const router = Router();
 
-/// In dev the OTP is returned in the response so the app can be driven without an SMS gateway.
-const DEV_OTP_ECHO = process.env.PULSE_ECHO_OTP !== 'false';
 const OTP_TTL_MINUTES = 10;
+
+/// Only ever echo the code when no real gateway is configured.
+const DEV_OTP_ECHO = isDevOtpMode && process.env.PULSE_ECHO_OTP !== 'false';
+
+/// This endpoint is unauthenticated and costs money per call, so cap it.
+const MAX_SENDS_PER_HOUR = 5;
+const RESEND_COOLDOWN_SECONDS = 30;
 
 const findByMobile = db.prepare('SELECT * FROM users WHERE mobile = ?');
 const findById = db.prepare('SELECT * FROM users WHERE id = ?');
@@ -19,25 +25,65 @@ const consumeOtp = db.prepare('UPDATE otps SET consumed = 1 WHERE id = ?');
 
 const normalizeMobile = (raw) => String(raw ?? '').replace(/\D/g, '').slice(-10);
 
-router.get('/get_otps/generate_otp.json', (req, res) => {
+const recentSends = db.prepare(
+  "SELECT COUNT(*) AS c FROM otps WHERE mobile = ? AND datetime(created_at) > datetime('now', '-1 hour')"
+);
+const lastSend = db.prepare('SELECT * FROM otps WHERE mobile = ? ORDER BY id DESC LIMIT 1');
+
+router.get('/get_otps/generate_otp.json', async (req, res) => {
   const mobile = normalizeMobile(req.query.mobile);
+  const countryCode = String(req.query.country_code ?? '+91');
+
   if (mobile.length !== 10) {
     return res.status(422).json({ success: false, message: 'Enter a valid 10-digit mobile number.' });
+  }
+
+  // Throttle: one code per 30s, and no more than five an hour per number.
+  const previous = row(lastSend, mobile);
+  if (previous?.created_at) {
+    // SQLite stores datetime('now') as UTC without a zone marker.
+    const issuedAt = new Date(`${previous.created_at.replace(' ', 'T')}Z`).getTime();
+    const secondsSince = (Date.now() - issuedAt) / 1000;
+    if (secondsSince < RESEND_COOLDOWN_SECONDS) {
+      return res.status(429).json({
+        success: false,
+        message: `Please wait ${Math.ceil(RESEND_COOLDOWN_SECONDS - secondsSince)}s before requesting another code.`,
+        retry_after: Math.ceil(RESEND_COOLDOWN_SECONDS - secondsSince),
+      });
+    }
+  }
+
+  const hourly = row(recentSends, mobile)?.c ?? 0;
+  if (hourly >= MAX_SENDS_PER_HOUR) {
+    return res.status(429).json({
+      success: false,
+      message: 'Too many codes requested for this number. Try again in an hour.',
+    });
   }
 
   const code = String(Math.floor(100000 + Math.random() * 900000));
   const expiresAt = new Date(Date.now() + OTP_TTL_MINUTES * 60_000).toISOString();
   insertOtp.run(mobile, code, expiresAt);
-  console.log(`[otp] ${mobile} -> ${code}`);
 
-  res.json({
-    success: true,
-    message: `OTP sent to ${mobile}.`,
-    mobile,
-    user_exists: !!row(findByMobile, mobile),
-    expires_in: OTP_TTL_MINUTES * 60,
-    ...(DEV_OTP_ECHO ? { otp: code } : {}),
-  });
+  try {
+    const result = await sendOtp({ mobile, countryCode, otp: code });
+    res.json({
+      success: true,
+      message: result.delivered
+        ? `OTP sent to ${countryCode} ${mobile}.`
+        : `OTP generated for ${mobile} (no SMS gateway configured).`,
+      mobile,
+      user_exists: !!row(findByMobile, mobile),
+      expires_in: OTP_TTL_MINUTES * 60,
+      ...(DEV_OTP_ECHO && result.echo ? { otp: result.echo } : {}),
+    });
+  } catch (err) {
+    console.error('[otp] delivery failed:', err.message);
+    res.status(502).json({
+      success: false,
+      message: 'We could not send the code right now. Please try again shortly.',
+    });
+  }
 });
 
 router.get('/get_otps/verify_otp.json', (req, res) => {

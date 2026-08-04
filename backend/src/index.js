@@ -2,7 +2,13 @@ import express from 'express';
 import cors from 'cors';
 import morgan from 'morgan';
 
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { db, row } from './db.js';
+import { ensureBootstrapAdmin } from './middleware/adminAuth.js';
+import { smsProvider } from './sms.js';
+import { router as adminRoutes } from './routes/admin.js';
 import { router as authRoutes } from './routes/auth.js';
 import { router as siteRoutes } from './routes/sites.js';
 import { router as eventRoutes } from './routes/events.js';
@@ -19,6 +25,12 @@ app.use(express.urlencoded({ extended: true }));
 app.use(morgan('dev'));
 
 app.get('/health', (_req, res) => res.json({ status: 'ok', service: 'panchshil-pulse-api' }));
+
+// Admin console — API first so /admin/api/* is never shadowed by the SPA.
+const here = path.dirname(fileURLToPath(import.meta.url));
+app.use(adminRoutes);
+app.use('/admin', express.static(path.join(here, 'admin')));
+app.get('/admin', (_req, res) => res.sendFile(path.join(here, 'admin', 'index.html')));
 
 app.use(authRoutes);
 app.use(siteRoutes);
@@ -54,8 +66,11 @@ async function ensureSeeded() {
 }
 
 await ensureSeeded();
+ensureBootstrapAdmin();
 
 // 0.0.0.0 is required by most container hosts; localhost-only would be unreachable.
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Panchshil Pulse API listening on port ${PORT}`);
+  console.log(`  Admin console: /admin`);
+  console.log(`  SMS provider:  ${smsProvider}${smsProvider === 'console' ? ' (codes are logged, not sent)' : ''}`);
 });
