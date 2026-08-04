@@ -3,8 +3,8 @@ node_modules/
 *.log
 backend/pulse.db
 backend/pulse.db-*
-backend/server.log
-backend/server.err
+backend/*.log
+backend/*.err
 .env
 .env.*
 
