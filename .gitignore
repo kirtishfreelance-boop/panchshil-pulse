@@ -7,6 +7,8 @@ backend/*.log
 backend/*.err
 .env
 .env.*
+!.env.example
+!backend/.env.example
 
 # Flutter / Dart
 app/.dart_tool/
