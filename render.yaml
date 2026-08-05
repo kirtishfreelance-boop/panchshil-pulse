@@ -5,6 +5,19 @@
 # which silently blocks every subsequent deploy.
 #
 # Persistence comes from Postgres instead, which the free plan does support.
+#
+# IMPORTANT: a Render free Postgres is DELETED 30 days after it is created.
+# It costs nothing and needs no setup, which makes it the right way to get
+# running today — but it is not permanent.
+#
+# For a database that stays free indefinitely, use Neon (neon.tech, free tier,
+# no card required):
+#   1. Create a Neon project and copy its connection string
+#   2. Delete the `databases:` block below and the `fromDatabase` entry
+#   3. Replace that entry with:  - key: DATABASE_URL
+#                                  sync: false
+#   4. Paste the Neon string into Render -> Environment -> DATABASE_URL
+# No application code changes — the server only ever reads DATABASE_URL.
 
 databases:
   - name: pulse-db
