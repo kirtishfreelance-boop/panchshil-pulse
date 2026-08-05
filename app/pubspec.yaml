@@ -1,7 +1,7 @@
-name: panchshil_pulse
-description: Panchshil Pulse — the community app for Panchshil office parks and residences.
+﻿name: panchshil_pulse
+description: Panchshil Pulse â€” the community app for Panchshil office parks and residences.
 publish_to: "none"
-version: 1.0.1+2
+version: 1.1.0+3
 
 environment:
   # 3.6 is the floor for Color.withValues() and the *ThemeData theme classes.
@@ -21,7 +21,7 @@ dependencies:
   # Storage
   shared_preferences: ^2.3.3
 
-  # UI toolkit — mirrors the original app's stack
+  # UI toolkit â€” mirrors the original app's stack
   flutter_screenutil: ^5.9.3
   flutter_svg: ^2.0.10+1
   cached_network_image: ^3.4.1
@@ -91,3 +91,4 @@ flutter:
     - family: Trykker
       fonts:
         - asset: assets/fonts/Trykker-Regular.ttf
+

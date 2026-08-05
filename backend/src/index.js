@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 import { closePool, one } from './db.js';
 import { ensureSchema } from './schema.js';
+import { backfillModules } from './backfill.js';
 import { ensureBootstrapAdmin } from './middleware/adminAuth.js';
 import { smsProvider } from './sms.js';
 import { router as adminRoutes } from './routes/admin.js';
@@ -118,6 +119,14 @@ async function prepareDatabase() {
     console.log('Empty database detected — seeding.');
     const { seed } = await import('./seed.js');
     await seed();
+    return;
+  }
+
+  // The database already has real data, so the full seed will not run. Fill in
+  // any module whose tables arrived empty with this deploy.
+  const filled = await backfillModules();
+  if (filled.length) {
+    console.log(`Backfilled starter content for: ${filled.join(', ')}`);
   }
 }
 
