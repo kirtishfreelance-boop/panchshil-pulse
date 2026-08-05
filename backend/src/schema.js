@@ -194,6 +194,88 @@ CREATE TABLE IF NOT EXISTS admin_sessions (
   expires_at TIMESTAMPTZ NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Amenities ---------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS facility_categories (
+  id       SERIAL PRIMARY KEY,
+  site_id  INTEGER NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+  name     TEXT NOT NULL,
+  icon     TEXT,
+  -- 'bookable' takes a time slot; 'requestable' is a request the estate team fulfils.
+  fac_type TEXT NOT NULL DEFAULT 'bookable',
+  position INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS facilities (
+  id             SERIAL PRIMARY KEY,
+  site_id        INTEGER NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+  category_id    INTEGER REFERENCES facility_categories(id) ON DELETE SET NULL,
+  name           TEXT NOT NULL,
+  description    TEXT,
+  location       TEXT,
+  cover_image    TEXT,
+  capacity       INTEGER NOT NULL DEFAULT 0,
+  -- Local wall-clock opening hours, e.g. 06:00 to 22:00.
+  opens_at       TIME NOT NULL DEFAULT '06:00',
+  closes_at      TIME NOT NULL DEFAULT '22:00',
+  slot_minutes   INTEGER NOT NULL DEFAULT 60,
+  price_per_slot NUMERIC(12,2) NOT NULL DEFAULT 0,
+  max_per_user   INTEGER NOT NULL DEFAULT 2,
+  active         BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS facility_bookings (
+  id          SERIAL PRIMARY KEY,
+  facility_id INTEGER NOT NULL REFERENCES facilities(id) ON DELETE CASCADE,
+  user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  starts_at   TIMESTAMPTZ NOT NULL,
+  ends_at     TIMESTAMPTZ NOT NULL,
+  status      TEXT NOT NULL DEFAULT 'confirmed',
+  amount_paid NUMERIC(12,2) NOT NULL DEFAULT 0,
+  notes       TEXT,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_bookings_facility_time
+  ON facility_bookings (facility_id, starts_at);
+
+-- Documents ---------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS document_folders (
+  id          SERIAL PRIMARY KEY,
+  site_id     INTEGER NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+  name        TEXT NOT NULL,
+  description TEXT,
+  position    INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS documents (
+  id          SERIAL PRIMARY KEY,
+  site_id     INTEGER NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+  folder_id   INTEGER REFERENCES document_folders(id) ON DELETE CASCADE,
+  title       TEXT NOT NULL,
+  description TEXT,
+  file_url    TEXT NOT NULL,
+  file_type   TEXT,
+  size_kb     INTEGER NOT NULL DEFAULT 0,
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- SOS directory -----------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS sos_contacts (
+  id        SERIAL PRIMARY KEY,
+  site_id   INTEGER NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+  name      TEXT NOT NULL,
+  role      TEXT,
+  phone     TEXT NOT NULL,
+  category  TEXT NOT NULL DEFAULT 'Emergency',
+  -- Shown first and highlighted, for police/fire/ambulance style entries.
+  is_urgent BOOLEAN NOT NULL DEFAULT FALSE,
+  position  INTEGER NOT NULL DEFAULT 0
+);
 `);
 }
 
@@ -207,6 +289,8 @@ export async function resyncSequences() {
     'user_calendars', 'noticeboards', 'communities', 'community_members',
     'posts', 'comments', 'like_things', 'wallet_transactions',
     'service_categories', 'admins', 'otps',
+    'facility_categories', 'facilities', 'facility_bookings',
+    'document_folders', 'documents', 'sos_contacts',
   ];
   for (const table of tables) {
     await query(

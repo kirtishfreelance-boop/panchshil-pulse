@@ -16,6 +16,7 @@ import { router as eventRoutes } from './routes/events.js';
 import { router as noticeRoutes } from './routes/notices.js';
 import { router as walletRoutes } from './routes/wallet.js';
 import { router as communityRoutes } from './routes/community.js';
+import { router as amenityRoutes } from './routes/amenities.js';
 
 const app = express();
 const PORT = Number(process.env.PORT ?? 4000);
@@ -92,6 +93,7 @@ app.use(eventRoutes);
 app.use(noticeRoutes);
 app.use(walletRoutes);
 app.use(communityRoutes);
+app.use(amenityRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ success: false, message: `No route for ${req.method} ${req.path}` });

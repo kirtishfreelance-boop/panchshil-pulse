@@ -4,8 +4,11 @@ import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/pulse_widgets.dart';
 import '../../providers/theme_provider.dart';
+import '../amenities/amenities_screen.dart';
+import '../documents/documents_screen.dart';
 import '../events/event_list_screen.dart';
 import '../notices/notice_screen.dart';
+import '../sos/sos_directory_screen.dart';
 import '../wallet/wallet_screen.dart';
 
 /// The service grid. Modules that ship in a later phase route to a placeholder
@@ -22,9 +25,11 @@ class DiscoverScreen extends StatelessWidget {
         'assets/my_wallet/add_balance_icon_dark.png',
         Icons.account_balance_wallet_rounded, _Target.wallet),
     _Service('Amenities', 'assets/discover_services/amenities_icon_light.png',
-        'assets/discover_services/amenities_icon_dark.png', Icons.pool_rounded, _Target.soon),
+        'assets/discover_services/amenities_icon_dark.png', Icons.pool_rounded,
+        _Target.amenities),
     _Service('Documents', 'assets/discover_services/document_icon_light.png',
-        'assets/discover_services/document_icon_dark.png', Icons.folder_rounded, _Target.soon),
+        'assets/discover_services/document_icon_dark.png', Icons.folder_rounded,
+        _Target.documents),
     _Service('Food Court', 'assets/discover_services/food_court_icon_light.png',
         'assets/discover_services/food_court_icon_dark.png',
         Icons.restaurant_rounded, _Target.soon),
@@ -39,7 +44,7 @@ class DiscoverScreen extends StatelessWidget {
         Icons.workspace_premium_rounded, _Target.soon),
     _Service('SOS Directory', 'assets/discover_services/sos_directory_icon_light.png',
         'assets/discover_services/sos_directory_icon_dark.png',
-        Icons.emergency_rounded, _Target.soon),
+        Icons.emergency_rounded, _Target.sos),
   ];
 
   @override
@@ -80,7 +85,7 @@ class DiscoverScreen extends StatelessWidget {
   }
 }
 
-enum _Target { events, notices, wallet, soon }
+enum _Target { events, notices, wallet, amenities, documents, sos, soon }
 
 class _Service {
   const _Service(this.label, this.lightAsset, this.darkAsset, this.fallback, this.target);
@@ -103,6 +108,11 @@ class _ServiceTile extends StatelessWidget {
       _Target.events => MaterialPageRoute<void>(builder: (_) => const EventListScreen()),
       _Target.notices => MaterialPageRoute<void>(builder: (_) => const NoticeScreen()),
       _Target.wallet => MaterialPageRoute<void>(builder: (_) => const WalletScreen()),
+      _Target.amenities =>
+        MaterialPageRoute<void>(builder: (_) => const AmenitiesScreen()),
+      _Target.documents =>
+        MaterialPageRoute<void>(builder: (_) => const DocumentsScreen()),
+      _Target.sos => MaterialPageRoute<void>(builder: (_) => const SosDirectoryScreen()),
       _Target.soon => null,
     };
 

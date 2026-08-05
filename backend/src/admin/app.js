@@ -4,7 +4,10 @@
 
   var TOKEN_KEY = 'pulse.admin.token';
   var token = localStorage.getItem(TOKEN_KEY);
-  var state = { page: 'dashboard', records: [], search: '', editing: null, sites: [], categories: [] };
+  var state = {
+    page: 'dashboard', records: [], search: '', editing: null,
+    sites: [], categories: [], facilityCategories: [], documentFolders: [],
+  };
 
   var $ = function (id) { return document.getElementById(id); };
   var esc = function (v) {
@@ -125,6 +128,126 @@
         { key: 'user_id', label: 'Author user ID', type: 'number', required: true },
         { key: 'community_id', label: 'Community ID', type: 'number' },
         { key: 'image_url', label: 'Image URL', wide: true },
+      ],
+    },
+    facility_categories: {
+      title: 'Amenity types', group: 'Amenities', resource: 'facility_categories', singular: 'type',
+      columns: [
+        { key: 'id', label: 'ID', width: 56 },
+        { key: 'name', label: 'Name' },
+        { key: 'fac_type', label: 'Kind', format: 'pill' },
+        { key: 'position', label: 'Order', format: 'number' },
+      ],
+      fields: [
+        { key: 'name', label: 'Name', wide: true, required: true, hint: 'e.g. Meeting Rooms, Sports' },
+        { key: 'fac_type', label: 'Kind', type: 'select', options: ['bookable', 'requestable'],
+          hint: 'Bookable takes a time slot; requestable is a request the team fulfils' },
+        { key: 'site_id', label: 'Site', type: 'select', source: 'sites', required: true },
+        { key: 'position', label: 'Sort order', type: 'number' },
+      ],
+    },
+    facilities: {
+      title: 'Amenities', group: 'Amenities', resource: 'facilities', singular: 'amenity',
+      columns: [
+        { key: 'id', label: 'ID', width: 56 },
+        { key: 'name', label: 'Name' },
+        { key: 'location', label: 'Location' },
+        { key: 'opens_at', label: 'Opens' },
+        { key: 'closes_at', label: 'Closes' },
+        { key: 'slot_minutes', label: 'Slot', format: 'number' },
+        { key: 'price_per_slot', label: 'Price', format: 'money' },
+        { key: 'active', label: 'Active', format: 'bool' },
+      ],
+      fields: [
+        { key: 'name', label: 'Name', wide: true, required: true },
+        { key: 'description', label: 'Description', type: 'textarea', wide: true },
+        { key: 'location', label: 'Location', wide: true, hint: 'e.g. Tower A, Level 6' },
+        { key: 'cover_image', label: 'Cover image URL', wide: true },
+        { key: 'category_id', label: 'Amenity type', type: 'select', source: 'facilityCategories' },
+        { key: 'site_id', label: 'Site', type: 'select', source: 'sites', required: true },
+        { key: 'opens_at', label: 'Opens at', type: 'time', hint: '24-hour, e.g. 06:00' },
+        { key: 'closes_at', label: 'Closes at', type: 'time', hint: '24-hour, e.g. 22:00' },
+        { key: 'slot_minutes', label: 'Slot length (minutes)', type: 'number', hint: '60 gives hourly slots' },
+        { key: 'price_per_slot', label: 'Price per slot (₹)', type: 'number', hint: '0 for free' },
+        { key: 'capacity', label: 'Capacity (people)', type: 'number' },
+        { key: 'max_per_user', label: 'Max upcoming bookings per member', type: 'number' },
+        { key: 'active', label: 'Bookable', type: 'checkbox' },
+      ],
+    },
+    facility_bookings: {
+      title: 'Bookings', group: 'Amenities', resource: 'facility_bookings', singular: 'booking',
+      columns: [
+        { key: 'id', label: 'ID', width: 56 },
+        { key: 'facility_id', label: 'Amenity', format: 'number' },
+        { key: 'user_id', label: 'Member', format: 'number' },
+        { key: 'starts_at', label: 'From', format: 'datetime' },
+        { key: 'ends_at', label: 'To', format: 'datetime' },
+        { key: 'status', label: 'Status', format: 'pill' },
+        { key: 'amount_paid', label: 'Paid', format: 'money' },
+      ],
+      fields: [
+        { key: 'facility_id', label: 'Amenity ID', type: 'number', required: true },
+        { key: 'user_id', label: 'Member ID', type: 'number', required: true },
+        { key: 'starts_at', label: 'From', type: 'datetime-local', required: true },
+        { key: 'ends_at', label: 'To', type: 'datetime-local', required: true },
+        { key: 'status', label: 'Status', type: 'select', options: ['confirmed', 'cancelled'] },
+        { key: 'amount_paid', label: 'Amount paid (₹)', type: 'number' },
+        { key: 'notes', label: 'Notes', type: 'textarea', wide: true },
+      ],
+    },
+    document_folders: {
+      title: 'Document folders', group: 'Documents', resource: 'document_folders', singular: 'folder',
+      columns: [
+        { key: 'id', label: 'ID', width: 56 },
+        { key: 'name', label: 'Name' },
+        { key: 'description', label: 'Description', truncate: true },
+        { key: 'position', label: 'Order', format: 'number' },
+      ],
+      fields: [
+        { key: 'name', label: 'Name', wide: true, required: true, hint: 'e.g. Lease Agreements' },
+        { key: 'description', label: 'Description', type: 'textarea', wide: true },
+        { key: 'site_id', label: 'Site', type: 'select', source: 'sites', required: true },
+        { key: 'position', label: 'Sort order', type: 'number' },
+      ],
+    },
+    documents: {
+      title: 'Documents', group: 'Documents', resource: 'documents', singular: 'document',
+      columns: [
+        { key: 'id', label: 'ID', width: 56 },
+        { key: 'title', label: 'Title' },
+        { key: 'file_type', label: 'Type' },
+        { key: 'size_kb', label: 'Size (KB)', format: 'number' },
+        { key: 'updated_at', label: 'Updated', format: 'datetime' },
+      ],
+      fields: [
+        { key: 'title', label: 'Title', wide: true, required: true },
+        { key: 'description', label: 'Description', type: 'textarea', wide: true },
+        { key: 'file_url', label: 'File URL', wide: true, required: true,
+          hint: 'Public link to the PDF or image — Google Drive, S3, anywhere' },
+        { key: 'folder_id', label: 'Folder', type: 'select', source: 'documentFolders' },
+        { key: 'site_id', label: 'Site', type: 'select', source: 'sites', required: true },
+        { key: 'file_type', label: 'File type', type: 'select', options: ['PDF', 'DOC', 'XLS', 'IMG', 'OTHER'] },
+        { key: 'size_kb', label: 'Size in KB', type: 'number' },
+      ],
+    },
+    sos_contacts: {
+      title: 'SOS directory', group: 'Directory', resource: 'sos_contacts', singular: 'contact',
+      columns: [
+        { key: 'id', label: 'ID', width: 56 },
+        { key: 'name', label: 'Name' },
+        { key: 'role', label: 'Role' },
+        { key: 'phone', label: 'Phone' },
+        { key: 'category', label: 'Category' },
+        { key: 'is_urgent', label: 'Urgent', format: 'bool' },
+      ],
+      fields: [
+        { key: 'name', label: 'Name', wide: true, required: true },
+        { key: 'phone', label: 'Phone', required: true, hint: 'Dialled exactly as entered' },
+        { key: 'role', label: 'Role', hint: 'e.g. Estate Manager' },
+        { key: 'category', label: 'Category', hint: 'e.g. Emergency, Facilities, Security' },
+        { key: 'site_id', label: 'Site', type: 'select', source: 'sites', required: true },
+        { key: 'is_urgent', label: 'Show first, highlighted', type: 'checkbox' },
+        { key: 'position', label: 'Sort order', type: 'number' },
       ],
     },
     users: {
@@ -387,6 +510,9 @@
           html += '</select>';
         } else if (f.type === 'datetime-local') {
           html += '<input type="datetime-local" id="f_' + f.key + '" value="' + toLocalInput(value) + '">';
+        } else if (f.type === 'time') {
+          // Postgres returns TIME as "06:00:00"; the input wants "06:00".
+          html += '<input type="time" id="f_' + f.key + '" value="' + esc(String(value || '').slice(0, 5)) + '">';
         } else {
           html += '<input type="' + (f.type || 'text') + '" id="f_' + f.key + '" value="' + esc(value) + '">';
         }
@@ -582,9 +708,16 @@
     $('app').hidden = false;
     $('who').textContent = admin.email;
     // Dropdown sources the editors depend on.
-    Promise.all([api('/sites'), api('/event_categories')]).then(function (r) {
+    Promise.all([
+      api('/sites'),
+      api('/event_categories'),
+      api('/facility_categories'),
+      api('/document_folders'),
+    ]).then(function (r) {
       state.sites = r[0].records || [];
       state.categories = r[1].records || [];
+      state.facilityCategories = r[2].records || [];
+      state.documentFolders = r[3].records || [];
     }).catch(function () { /* editors fall back to blank dropdowns */ });
     buildNav();
     go('dashboard');

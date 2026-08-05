@@ -80,7 +80,9 @@ export async function seed() {
     // Order matters: children before parents.
     await c.query(`TRUNCATE like_things, comments, posts, community_members, communities,
       noticeboards, user_calendars, event_registrations, events, event_categories,
-      wallet_transactions, user_sites, users, sites, service_categories, otps
+      wallet_transactions, user_sites, users, sites, service_categories, otps,
+      facility_bookings, facilities, facility_categories,
+      documents, document_folders, sos_contacts
       RESTART IDENTITY CASCADE`);
 
     for (const s of sites) {
@@ -200,6 +202,100 @@ export async function seed() {
       await c.query(
         'INSERT INTO wallet_transactions (user_id, amount, kind, note, reference) VALUES ($1,$2,$3,$4,$5)',
         t
+      );
+    }
+
+    // --- Amenities ---------------------------------------------------------
+
+    const facilityCategories = [
+      [1, 1, 'Meeting Rooms', 'bookable', 1],
+      [2, 1, 'Sports & Fitness', 'bookable', 2],
+      [3, 1, 'Event Spaces', 'bookable', 3],
+      [4, 1, 'Estate Services', 'requestable', 4],
+    ];
+    for (const fc of facilityCategories) {
+      await c.query(
+        'INSERT INTO facility_categories (id, site_id, name, fac_type, position) VALUES ($1,$2,$3,$4,$5)',
+        fc
+      );
+    }
+
+    const facilities = [
+      [1, 1, 1, 'Boardroom — Tower A', 'Seats 12, video conferencing, whiteboard wall.', 'Tower A, Level 6', `${IMG}photo-1497366216548-37526070297c?w=1200`, 12, '08:00', '20:00', 60, 0, 2],
+      [2, 1, 1, 'Huddle Room 2', 'Four-seater for quick calls and stand-ups.', 'Tower B, Level 3', `${IMG}photo-1517502884422-41eaead166d4?w=1200`, 4, '08:00', '20:00', 30, 0, 3],
+      [3, 1, 2, 'Badminton Court', 'Wooden flooring, racquets available at the desk.', 'Sports Block, Ground', `${IMG}photo-1626224583764-f87db24ac4ea?w=1200`, 4, '06:00', '22:00', 60, 200, 2],
+      [4, 1, 2, 'Gymnasium', 'Cardio and free weights. Instructor on duty mornings.', 'Sports Block, Level 1', `${IMG}photo-1534438327276-14e5300c3a48?w=1200`, 30, '05:00', '23:00', 60, 0, 1],
+      [5, 1, 3, 'Amphitheatre', 'Open-air, seats 200. Sound system on request.', 'Central Plaza', `${IMG}photo-1478147427282-58a87a120781?w=1200`, 200, '07:00', '22:00', 120, 2500, 1],
+      [6, 2, 1, 'Conference Hall — Eon', 'Seats 40, projector and podium.', 'Building 3, Level 2', `${IMG}photo-1505373877841-8d25f7d46678?w=1200`, 40, '09:00', '19:00', 60, 1000, 1],
+    ];
+    for (const f of facilities) {
+      await c.query(
+        `INSERT INTO facilities (id, site_id, category_id, name, description, location, cover_image,
+           capacity, opens_at, closes_at, slot_minutes, price_per_slot, max_per_user)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+        f
+      );
+    }
+
+    // One upcoming booking so "My bookings" is not empty on first run.
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(10, 0, 0, 0);
+    const tomorrowEnd = new Date(tomorrow.getTime() + 60 * 60_000);
+    await c.query(
+      `INSERT INTO facility_bookings (facility_id, user_id, starts_at, ends_at, amount_paid)
+       VALUES (1, 1, $1, $2, 0)`,
+      [tomorrow.toISOString(), tomorrowEnd.toISOString()]
+    );
+
+    // --- Documents ---------------------------------------------------------
+
+    const folders = [
+      [1, 1, 'Estate Policies', 'House rules, fit-out guidelines and access policy.', 1],
+      [2, 1, 'Safety & Compliance', 'Fire drills, evacuation plans, safety certificates.', 2],
+      [3, 1, 'Forms', 'Gate passes, work permits, visitor requests.', 3],
+      [4, 1, 'Notices Archive', 'Circulars issued over the past year.', 4],
+    ];
+    for (const f of folders) {
+      await c.query(
+        'INSERT INTO document_folders (id, site_id, name, description, position) VALUES ($1,$2,$3,$4,$5)',
+        f
+      );
+    }
+
+    const documents = [
+      [1, 1, 1, 'Tenant Handbook 2026', 'Everything from access hours to fit-out rules.', 'https://www.africau.edu/images/default/sample.pdf', 'PDF', 2400],
+      [2, 1, 1, 'Fit-out Guidelines', 'Approved materials, contractor rules, timelines.', 'https://www.africau.edu/images/default/sample.pdf', 'PDF', 1800],
+      [3, 1, 2, 'Fire Evacuation Plan — Tower A', 'Floor-wise assembly points and marshal list.', 'https://www.africau.edu/images/default/sample.pdf', 'PDF', 950],
+      [4, 1, 2, 'Fire Safety Certificate', 'Valid through the current financial year.', 'https://www.africau.edu/images/default/sample.pdf', 'PDF', 420],
+      [5, 1, 3, 'Visitor Gate Pass Form', 'Submit at least 24 hours in advance.', 'https://www.africau.edu/images/default/sample.pdf', 'PDF', 180],
+      [6, 1, 3, 'After-hours Work Permit', 'Required for any work past 20:00.', 'https://www.africau.edu/images/default/sample.pdf', 'PDF', 210],
+    ];
+    for (const d of documents) {
+      await c.query(
+        `INSERT INTO documents (id, site_id, folder_id, title, description, file_url, file_type, size_kb)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+        d
+      );
+    }
+
+    // --- SOS directory -----------------------------------------------------
+
+    const sos = [
+      [1, 1, 'Emergency Ambulance', 'National helpline', '108', 'Emergency', true, 1],
+      [2, 1, 'Fire Brigade', 'National helpline', '101', 'Emergency', true, 2],
+      [3, 1, 'Police', 'National helpline', '100', 'Emergency', true, 3],
+      [4, 1, 'Estate Control Room', 'Open 24 hours', '+912066812345', 'Estate', false, 1],
+      [5, 1, 'Security Desk — Main Gate', 'Gate 1', '+912066812346', 'Security', false, 1],
+      [6, 1, 'Facilities Helpdesk', 'Weekdays 08:00–20:00', '+912066812347', 'Facilities', false, 1],
+      [7, 1, 'Ruby Hall Clinic', 'Nearest hospital, 2.4 km', '+912026163391', 'Medical', false, 1],
+      [8, 1, 'Estate Manager', 'Rohan Kulkarni', '+919822012345', 'Estate', false, 2],
+    ];
+    for (const s of sos) {
+      await c.query(
+        `INSERT INTO sos_contacts (id, site_id, name, role, phone, category, is_urgent, position)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+        s
       );
     }
   });

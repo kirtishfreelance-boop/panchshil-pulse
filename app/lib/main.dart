@@ -8,6 +8,7 @@ import 'core/network/api_client.dart';
 import 'core/storage/session_store.dart';
 import 'core/theme/app_theme.dart';
 import 'features/splash/splash_screen.dart';
+import 'providers/amenity_provider.dart';
 import 'providers/auth_provider.dart';
 import 'providers/community_provider.dart';
 import 'providers/event_provider.dart';
@@ -48,6 +49,7 @@ class PulseApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => NoticeProvider(api)),
         ChangeNotifierProvider(create: (_) => CommunityProvider(api)),
         ChangeNotifierProvider(create: (_) => WalletProvider(api)),
+        ChangeNotifierProvider(create: (_) => AmenityProvider(api)),
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, theme, _) => ScreenUtilInit(

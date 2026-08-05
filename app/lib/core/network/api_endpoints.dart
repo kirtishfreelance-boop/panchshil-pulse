@@ -50,16 +50,19 @@ abstract final class Api {
   static const initiatePayment = '/pms/easebuzz/initiate_payment';
   static const paymentCallback = '/pms/easebuzz/callback';
 
-  // --- Amenities (wired in the next phase) --------------------------------
-  static const bookableCategories =
-      '/pms/admin/facility_categories.json?q[fac_type_eq]=bookable';
-  static const requestableCategories =
-      '/pms/admin/facility_categories.json?q[fac_type_in]=requestable';
+  // --- Amenities ----------------------------------------------------------
+  static const facilityCategories = '/pms/admin/facility_categories.json';
   static const availableFacilities = '/pms/admin/facility_setups/available_facilities.json';
-  static const facilityBookings = '/pms/facility_bookings.json';
+  static String facility(int id) => '/pms/admin/facility_setups/$id.json';
   static const slotsStatus = '/pms/facility_bookings/slots_status.json';
-  static const upcomingBookings = '/pms/admin/facility_bookings.json?upcomming_booking=true';
-  static const bookingLogs = '/facility_booking_logs.json';
+  static const facilityBookings = '/pms/facility_bookings.json';
+  static const myBookings = '/pms/admin/facility_bookings.json';
+  static String cancelBooking(int id) => '/pms/facility_bookings/$id.json';
+
+  // --- Documents & directory ----------------------------------------------
+  static const documentFolders = '/document_folders.json';
+  static const documents = '/documents.json';
+  static const sosContacts = '/sos_contacts.json';
 
   // --- Other modules (next phase) -----------------------------------------
   static const curatedCategories =
