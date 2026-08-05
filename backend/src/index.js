@@ -5,7 +5,8 @@ import morgan from 'morgan';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { db, row } from './db.js';
+import { closePool, one } from './db.js';
+import { ensureSchema } from './schema.js';
 import { ensureBootstrapAdmin } from './middleware/adminAuth.js';
 import { smsProvider } from './sms.js';
 import { router as adminRoutes } from './routes/admin.js';
@@ -44,14 +45,13 @@ app.use(morgan(isProduction ? 'combined' : 'dev'));
  * database on purpose — a process that is listening but cannot read its own
  * tables is not actually serving, and should fail the check.
  */
-app.get('/health', (_req, res) => {
+app.get('/health', async (_req, res) => {
   try {
-    row(db.prepare('SELECT 1 AS ok'));
+    await one('SELECT 1 AS ok');
     res.json({
       status: 'ok',
       service: 'panchshil-pulse-api',
       database: 'reachable',
-      persistent: Boolean(process.env.PULSE_DB),
       uptime_seconds: Math.round(process.uptime()),
     });
   } catch (err) {
@@ -107,24 +107,24 @@ app.use((err, _req, res, _next) => {
   });
 });
 
-/**
- * Free hosting tiers hand out an ephemeral disk, so the SQLite file is empty
- * after every deploy. Seed on boot when there is nothing there, which keeps a
- * fresh deployment immediately usable.
- */
-async function ensureSeeded() {
-  const sites = row(db.prepare('SELECT COUNT(*) AS c FROM sites'));
-  if ((sites?.c ?? 0) > 0) return;
-  console.log('Empty database detected — seeding.');
-  await import('./seed.js');
+/** Creates any missing tables, then seeds demo content into an empty database. */
+async function prepareDatabase() {
+  await ensureSchema();
+
+  const sites = await one('SELECT COUNT(*)::int AS c FROM sites');
+  if ((sites?.c ?? 0) === 0) {
+    console.log('Empty database detected — seeding.');
+    const { seed } = await import('./seed.js');
+    await seed();
+  }
 }
 
 // Boot work must never prevent the server from listening: a process that exits
 // before binding fails Render's health check and lands in a restart loop, which
 // is far harder to diagnose than a running service with an empty table.
 try {
-  await ensureSeeded();
-  ensureBootstrapAdmin();
+  await prepareDatabase();
+  await ensureBootstrapAdmin();
 } catch (err) {
   console.error('Start-up task failed; continuing so the service stays up:', err);
 }
@@ -145,9 +145,9 @@ const server = app.listen(PORT, '0.0.0.0', () => {
 for (const signal of ['SIGTERM', 'SIGINT']) {
   process.on(signal, () => {
     console.log(`${signal} received, shutting down.`);
-    server.close(() => {
+    server.close(async () => {
       try {
-        db.close();
+        await closePool();
       } catch {
         // Already closed, or never opened — nothing useful to do here.
       }

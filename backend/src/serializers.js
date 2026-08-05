@@ -1,9 +1,13 @@
-import { db, row, rows } from './db.js';
+/**
+ * Row shaping for API responses.
+ *
+ * These take rows that already carry every column they need — the queries in
+ * the route files join and aggregate up front rather than looking values up per
+ * row. Under SQLite the per-row lookups were cheap; against a network database
+ * they would be one round trip each, so an events list would cost dozens.
+ */
 
-const countRegs = db.prepare('SELECT COUNT(*) AS c, COALESCE(SUM(guests), 0) AS g FROM event_registrations WHERE event_id = ?');
-const myReg = db.prepare('SELECT * FROM event_registrations WHERE event_id = ? AND user_id = ?');
-const inCalendar = db.prepare('SELECT 1 AS x FROM user_calendars WHERE user_id = ? AND event_id = ?');
-const catName = db.prepare('SELECT name FROM event_categories WHERE id = ?');
+const num = (value) => (value === null || value === undefined ? 0 : Number(value));
 
 export const userJson = (u) => ({
   id: u.id,
@@ -19,8 +23,8 @@ export const userJson = (u) => ({
   profile_image: u.profile_image,
   site_id: u.site_id,
   registered: !!u.registered,
-  wallet_balance: u.wallet_balance,
-  loyalty_points: u.loyalty_points,
+  wallet_balance: num(u.wallet_balance),
+  loyalty_points: num(u.loyalty_points),
 });
 
 export const siteJson = (s) => ({
@@ -32,15 +36,20 @@ export const siteJson = (s) => ({
   active: !!s.active,
 });
 
-export const eventJson = (e, userId) => {
-  const c = row(countRegs, e.id);
-  const mine = userId ? row(myReg, e.id, userId) : null;
-  const seatsTaken = (c?.c ?? 0) + (c?.g ?? 0);
+/**
+ * Expects the event query to supply `category_name`, `seats_taken`, the
+ * viewer's `reg_*` columns, and `in_calendar`.
+ */
+export const eventJson = (e) => {
+  const capacity = num(e.capacity);
+  const seatsTaken = num(e.seats_taken);
+  const endsOrStarts = e.ends_at ?? e.starts_at;
+
   return {
     id: e.id,
     site_id: e.site_id,
     category_id: e.category_id,
-    category_name: e.category_id ? row(catName, e.category_id)?.name ?? null : null,
+    category_name: e.category_name ?? null,
     title: e.title,
     description: e.description,
     venue: e.venue,
@@ -49,24 +58,24 @@ export const eventJson = (e, userId) => {
     ends_at: e.ends_at,
     rsvp_by: e.rsvp_by,
     is_paid: !!e.is_paid,
-    amount: e.amount,
-    capacity: e.capacity,
+    amount: num(e.amount),
+    capacity,
     seats_taken: seatsTaken,
-    seats_left: e.capacity > 0 ? Math.max(0, e.capacity - seatsTaken) : null,
+    seats_left: capacity > 0 ? Math.max(0, capacity - seatsTaken) : null,
     status: e.status,
-    is_past: new Date(e.ends_at ?? e.starts_at) < new Date(),
-    registration: mine
+    is_past: new Date(endsOrStarts) < new Date(),
+    registration: e.reg_id
       ? {
-          id: mine.id,
-          guests: mine.guests,
-          amount_paid: mine.amount_paid,
-          payment_status: mine.payment_status,
-          ticket_code: mine.ticket_code,
-          attended: !!mine.attended,
-          attended_at: mine.attended_at,
+          id: e.reg_id,
+          guests: num(e.reg_guests),
+          amount_paid: num(e.reg_amount_paid),
+          payment_status: e.reg_payment_status,
+          ticket_code: e.reg_ticket_code,
+          attended: !!e.reg_attended,
+          attended_at: e.reg_attended_at,
         }
       : null,
-    in_calendar: userId ? !!row(inCalendar, userId, e.id) : false,
+    in_calendar: !!e.in_calendar,
   };
 };
 
@@ -82,70 +91,59 @@ export const noticeJson = (n) => ({
   created_at: n.created_at,
 });
 
-const memberOf = db.prepare('SELECT * FROM community_members WHERE community_id = ? AND user_id = ?');
+/** Expects `joined`, `membership_status` and `role` from a LEFT JOIN. */
+export const communityJson = (c) => ({
+  id: c.id,
+  site_id: c.site_id,
+  name: c.name,
+  description: c.description,
+  cover_image: c.cover_image,
+  category: c.category,
+  members_count: num(c.members_count),
+  trending: !!c.trending,
+  joined: !!c.joined,
+  membership_status: c.membership_status ?? null,
+  role: c.role ?? null,
+});
 
-export const communityJson = (c, userId) => {
-  const mine = userId ? row(memberOf, c.id, userId) : null;
-  return {
-    id: c.id,
-    site_id: c.site_id,
-    name: c.name,
-    description: c.description,
-    cover_image: c.cover_image,
-    category: c.category,
-    members_count: c.members_count,
-    trending: !!c.trending,
-    joined: !!mine,
-    membership_status: mine?.status ?? null,
-    role: mine?.role ?? null,
-  };
-};
+const authorFrom = (row) =>
+  row.author_id
+    ? {
+        id: row.author_id,
+        full_name: [row.author_firstname, row.author_lastname].filter(Boolean).join(' '),
+        profile_image: row.author_profile_image,
+        designation: row.author_designation,
+        company_name: row.author_company_name,
+      }
+    : null;
 
-const author = db.prepare('SELECT id, firstname, lastname, profile_image, designation, company_name FROM users WHERE id = ?');
-const countComments = db.prepare('SELECT COUNT(*) AS c FROM comments WHERE post_id = ?');
-const countLikes = db.prepare("SELECT COUNT(*) AS c FROM like_things WHERE likeable_type = 'Post' AND likeable_id = ?");
-const myLike = db.prepare("SELECT reaction FROM like_things WHERE likeable_type = 'Post' AND likeable_id = ? AND user_id = ?");
-const communityName = db.prepare('SELECT name FROM communities WHERE id = ?');
+/** Expects author_* columns plus `comments_count`, `likes_count`, `my_reaction`. */
+export const postJson = (p) => ({
+  id: p.id,
+  community_id: p.community_id,
+  community_name: p.community_name ?? null,
+  body: p.body,
+  image_url: p.image_url,
+  created_at: p.created_at,
+  author: authorFrom(p),
+  comments_count: num(p.comments_count),
+  likes_count: num(p.likes_count),
+  my_reaction: p.my_reaction ?? null,
+});
 
-export const postJson = (p, userId) => {
-  const a = row(author, p.user_id);
-  return {
-    id: p.id,
-    community_id: p.community_id,
-    community_name: p.community_id ? row(communityName, p.community_id)?.name ?? null : null,
-    body: p.body,
-    image_url: p.image_url,
-    created_at: p.created_at,
-    author: a
-      ? {
-          id: a.id,
-          full_name: [a.firstname, a.lastname].filter(Boolean).join(' '),
-          profile_image: a.profile_image,
-          designation: a.designation,
-          company_name: a.company_name,
-        }
-      : null,
-    comments_count: row(countComments, p.id)?.c ?? 0,
-    likes_count: row(countLikes, p.id)?.c ?? 0,
-    my_reaction: userId ? row(myLike, p.id, userId)?.reaction ?? null : null,
-  };
-};
+export const commentJson = (c) => ({
+  id: c.id,
+  post_id: c.post_id,
+  body: c.body,
+  created_at: c.created_at,
+  author: authorFrom(c),
+});
 
-export const commentJson = (c) => {
-  const a = row(author, c.user_id);
-  return {
-    id: c.id,
-    post_id: c.post_id,
-    body: c.body,
-    created_at: c.created_at,
-    author: a
-      ? {
-          id: a.id,
-          full_name: [a.firstname, a.lastname].filter(Boolean).join(' '),
-          profile_image: a.profile_image,
-        }
-      : null,
-  };
-};
-
-export { rows, row };
+export const txnJson = (t) => ({
+  id: t.id,
+  amount: num(t.amount),
+  kind: t.kind,
+  note: t.note,
+  reference: t.reference,
+  created_at: t.created_at,
+});

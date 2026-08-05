@@ -5,18 +5,18 @@
   "type": "module",
   "description": "Backend API for the Panchshil Pulse community app",
   "engines": {
-    "node": ">=22.5.0"
+    "node": ">=20.0.0"
   },
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
-    "seed": "node src/seed.js",
-    "reset": "node -e \"import('node:fs').then(fs=>{try{fs.rmSync('pulse.db')}catch{}})\" && npm run seed"
+    "seed": "node src/seed.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
     "express": "^4.21.2",
     "jsonwebtoken": "^9.0.2",
-    "morgan": "^1.10.0"
+    "morgan": "^1.10.0",
+    "pg": "^8.22.0"
   }
 }

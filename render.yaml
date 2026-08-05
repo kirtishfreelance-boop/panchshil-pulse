@@ -1,26 +1,24 @@
 # Render Blueprint — Free Plan compatible.
 #
-# Deliberately contains no `disk:` block. Persistent disks require a paid
-# instance type, and Render rejects the entire blueprint sync when one appears
-# on a free service — which silently blocks every subsequent deploy.
+# No `disk:` block anywhere: persistent disks require a paid instance type, and
+# Render rejects the whole blueprint sync when one appears on a free service,
+# which silently blocks every subsequent deploy.
 #
-# Consequence: the filesystem is ephemeral. The SQLite database is recreated on
-# each deploy and the API re-seeds itself on boot, so demo content always comes
-# back but data created during testing does not survive a redeploy.
-#
-# To get persistence, change `plan: free` to `plan: starter` and add:
-#   disk:
-#     name: pulse-data
-#     mountPath: /var/data
-#     sizeGB: 1
-# then set PULSE_DB=/var/data/pulse.db.
+# Persistence comes from Postgres instead, which the free plan does support.
+
+databases:
+  - name: pulse-db
+    plan: free
+    databaseName: pulse
+    user: pulse
+    region: singapore
 
 services:
   - type: web
     name: panchshil-pulse-api
     runtime: node
     plan: free
-    region: singapore # closest Render region to India
+    region: singapore # must match the database region
     rootDir: backend
     buildCommand: npm ci
     startCommand: npm start
@@ -28,7 +26,14 @@ services:
     autoDeploy: true
 
     envVars:
-      # node:sqlite is only available from Node 22.5; Render's default is older.
+      # Wired automatically from the database above — nothing to copy by hand.
+      # To use Neon instead, delete this entry and set DATABASE_URL manually in
+      # the dashboard to Neon's connection string.
+      - key: DATABASE_URL
+        fromDatabase:
+          name: pulse-db
+          property: connectionString
+
       - key: NODE_VERSION
         value: "22.20.0"
 
@@ -40,8 +45,8 @@ services:
       - key: JWT_SECRET
         generateValue: true
 
-      # First administrator for /admin. Setting this also resets the owner
-      # password on the next deploy, so it doubles as password recovery.
+      # First administrator for /admin. Setting ADMIN_PASSWORD also resets the
+      # owner password on the next deploy, so it doubles as password recovery.
       - key: ADMIN_EMAIL
         value: admin@panchshil.com
       - key: ADMIN_PASSWORD
